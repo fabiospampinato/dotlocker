@@ -20,7 +20,7 @@ type Resolve<T> = {
 type Lock = {
   lockPath: string,
   stop: () => void
-  unlock: () => void
+  unlock: () => Promise<boolean> | boolean
 };
 
 type LockOptions = {

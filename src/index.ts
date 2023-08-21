@@ -2,19 +2,20 @@
 /* IMPORT */
 
 import fs from 'node:fs';
+import path from 'node:path';
 import whenExit from 'when-exit';
 import {DEFAULT_RETRIES, DEFAULT_RETRY_INTERVAL, DEFAULT_STALE_INTERVAL, DEFAULT_UPDATE_FREQUENCY} from './constants';
 import {fsAsync, fsSync} from './fs';
-import {isNodeError, loop, noop, onInterval} from './utils';
+import {isNodeError, loop, noop, nope, onInterval} from './utils';
 import type {Dispose, Resolve, Lock, LockOptions, LockedOptions, UnlockOptions} from './types';
 
 /* HELPERS */
 
-const LOCKS: Record<string, Lock> = {};
+const LOCKS: Partial<Record<string, Lock>> = {};
 
 const getLockPath = ( targetPath: string, lockPath?: string ): string => {
 
-  return lockPath || `${fs.realpathSync ( targetPath )}.lock`;
+  return lockPath ? path.resolve ( lockPath ) : `${fs.realpathSync ( targetPath )}.lock`;
 
 };
 
@@ -66,13 +67,13 @@ const lockAbstract = ( fs: typeof fsAsync | typeof fsSync, resolve: Resolve<Disp
 
       } else { // Lock acquisition succeeded
 
-        const lock = {
+        const lock: Lock = LOCKS[lockPath] = {
           lockPath,
           stop: noop,
-          unlock: noop
+          unlock: nope
         };
 
-        queueMicrotask ( () => { // Keeping the lock alive, but in the next microtask, which is actually faster for synchronous code
+        queueMicrotask ( () => { // Keeping the lock fresh, but in the next microtask, which is actually faster for synchronous code
 
           if ( LOCKS[lockPath] !== lock ) return; // Not our lock anymore
 
@@ -80,15 +81,17 @@ const lockAbstract = ( fs: typeof fsAsync | typeof fsSync, resolve: Resolve<Disp
 
         });
 
-        lock.unlock = (): void => {
+        lock.unlock = (): Promise<boolean> | boolean => {
 
-          if ( LOCKS[lockPath] !== lock ) return; // Not our lock anymore
+          if ( LOCKS[lockPath] !== lock ) return false; // Not our lock anymore
 
           delete LOCKS[lockPath];
 
           lock.stop ();
 
-          unlockAbstract ( fs, noop, targetPath, { ...options, lockPath } );
+          const unlockImpl = ( fs === fsAsync ) ? unlockAsync : unlockSync;
+
+          return unlockImpl ( targetPath, { ...options, lockPath } );
 
         };
 
@@ -150,6 +153,9 @@ const unlockAbstract = ( fs: typeof fsAsync | typeof fsSync, resolve: Resolve<bo
     fs.rmdir ( lockPath, error => { // Lock removal attempt
 
       if ( !error || ( isNodeError ( error ) && error.code === 'ENOENT' ) ) { // Lock removal succeeded
+
+        LOCKS[lockPath]?.stop ();
+        delete LOCKS[lockPath];
 
         resolve ( true );
 
@@ -239,6 +245,10 @@ const unlockAllSync = (): void => {
 
     const lock = LOCKS[lockPath];
 
+    if ( !lock ) continue;
+
+    delete LOCKS[lockPath];
+
     lock.stop ();
 
     unlockSync ( lockPath, {
@@ -252,6 +262,8 @@ const unlockAllSync = (): void => {
 };
 
 /* MAIN */
+
+//TODO: Add compromise detection, where we failed to update mtime quickly enough, it got updated by somebody else, and as a result we don't have a lock anymore
 
 const DotLocker = {
   /* ASYNC */

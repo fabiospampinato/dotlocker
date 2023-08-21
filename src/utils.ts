@@ -63,6 +63,12 @@ const noop = (): void => {
 
 };
 
+const nope = (): false => {
+
+  return false;
+
+};
+
 const onInterval = ( fn: Function, timeout: number ): Dispose => {
 
   const timer = setInterval ( fn, timeout );
@@ -85,4 +91,4 @@ const onTimeout = ( fn: Function, timeout: number ): Dispose => {
 
 /* EXPORT */
 
-export {castError, isError, isNodeError, loop, noop, onInterval, onTimeout};
+export {castError, isError, isNodeError, loop, noop, nope, onInterval, onTimeout};
