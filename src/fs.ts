@@ -33,7 +33,7 @@ const statAsync = ( path: string, cb: CallbackWithValue<fs.Stats> ): void => {
 
 const touchAsync = ( path: string, cb: CallbackWithoutValue ): void => {
 
-  const now = Date.now ();
+  const now = new Date ();
 
   fs.utimes ( path, now, now, cb );
 
@@ -101,7 +101,7 @@ const touchSync = ( path: string, cb: CallbackWithoutValue ): void => {
 
   try {
 
-    const now = Date.now ();
+    const now = new Date ();
 
     fs.utimesSync ( path, now, now );
 
