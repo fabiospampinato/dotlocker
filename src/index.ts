@@ -283,3 +283,4 @@ whenExit ( unlockAllSync );
 /* EXPORT */
 
 export default DotLocker;
+export type {LockOptions, LockedOptions, UnlockOptions};
